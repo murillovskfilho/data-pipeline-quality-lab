@@ -1,0 +1,35 @@
+{
+  "name": "data-pipeline-quality-lab",
+  "version": "1.0.0",
+  "description": "End-to-end and data-quality testing lab for a Kafka-fed medallion (bronze/silver/gold) data pipeline.",
+  "private": true,
+  "license": "MIT",
+  "author": "Murilo Filho",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "up": "docker compose up -d --build --wait",
+    "down": "docker compose down -v",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:e2e": "jest --selectProjects e2e",
+    "test:dq": "jest --selectProjects dq",
+    "seed": "tsx scripts/seed.ts",
+    "dq:report": "tsx scripts/dq-report.ts",
+    "canary:assert": "tsx scripts/assert-canary.ts"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

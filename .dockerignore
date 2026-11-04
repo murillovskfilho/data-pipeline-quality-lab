@@ -1,0 +1,8 @@
+node_modules
+dist
+reports
+.git
+.github
+tests
+scripts
+checks
