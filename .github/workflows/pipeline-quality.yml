@@ -1,0 +1,74 @@
+name: pipeline-quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *" # nightly data-quality audit
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: e2e + data quality (healthy pipeline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Start Kafka, Postgres and the pipeline
+        run: docker compose up -d --build --wait
+      - name: End-to-end tests
+        run: npm run test:e2e
+      - name: Seed a messy dataset (replays, out-of-order, invalid events)
+        run: npm run seed -- --seed 42 --shipments 500
+      - name: Data-quality report (fails on critical violations)
+        run: npm run dq:report
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dq-report
+          path: reports/
+          if-no-files-found: ignore
+      - name: Pipeline logs on failure
+        if: failure()
+        run: docker compose logs pipeline --tail 200
+
+  canary:
+    name: canary (injected faults must be caught)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FAULTS: dup_events,ignore_order,skip_gold
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start the pipeline WITH injected faults
+        run: docker compose up -d --build --wait
+      - name: Seed the same messy dataset
+        run: npm run seed -- --seed 42 --shipments 500
+      - name: Data-quality report (expected to find violations)
+        run: npm run dq:report -- --no-fail
+      - name: Assert every fault was detected
+        run: npm run canary:assert
+      - name: Upload canary report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dq-canary-report
+          path: reports/
+          if-no-files-found: ignore
